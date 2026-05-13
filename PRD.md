@@ -1,0 +1,3 @@
+- 유니티에서 임포트해서 사용할 수 있는 spinakker SDK 브릿지
+- 카메라 연결 확인, 이미지 획득, exposure, gain 등의 파라메터 get/set
+- visual studio, spinnaker 가 설치되어 있으니 빌드까지

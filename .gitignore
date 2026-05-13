@@ -1,0 +1,12 @@
+native/SpinnakerUnityBridge/bin/
+native/SpinnakerUnityBridge/obj/
+native/SpinnakerUnityBridge/.vs/
+unity/Library/
+unity/Logs/
+unity/Temp/
+unity/Obj/
+unity/Build/
+unity/Builds/
+unity/UserSettings/
+unity/Assets/Plugins/x86_64/*.dll
+unity/Assets/Plugins/x86_64/*.pdb
