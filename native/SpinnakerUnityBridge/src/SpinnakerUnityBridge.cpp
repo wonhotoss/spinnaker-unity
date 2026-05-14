@@ -46,7 +46,13 @@ struct BridgeState
     std::string lastError;
 };
 
-BridgeState g_state;
+BridgeState& bridge_state()
+{
+    static BridgeState* instance = new BridgeState();
+    return *instance;
+}
+
+#define g_state bridge_state()
 
 void set_error(const std::string& message)
 {

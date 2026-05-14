@@ -41,12 +41,14 @@
     <IntDir>$(SolutionDir)obj\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>SpinnakerUnityBridge</TargetName>
     <SpinnakerLibName>Spinnakerd_v140.lib</SpinnakerLibName>
+    <SpinnakerDllName>Spinnakerd_v140.dll</SpinnakerDllName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)obj\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>SpinnakerUnityBridge</TargetName>
     <SpinnakerLibName>Spinnaker_v140.lib</SpinnakerLibName>
+    <SpinnakerDllName>Spinnaker_v140.dll</SpinnakerDllName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -62,7 +64,8 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SpinnakerSdkDir)\lib64\$(SpinnakerLibFlavor);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(SpinnakerLibName);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SpinnakerLibName);delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>$(SpinnakerDllName);%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(SolutionDir)..\..\unity\Assets\Plugins\x86_64" mkdir "$(SolutionDir)..\..\unity\Assets\Plugins\x86_64"
@@ -88,7 +91,8 @@ if exist "$(TargetDir)$(TargetName).pdb" copy /Y "$(TargetDir)$(TargetName).pdb"
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SpinnakerSdkDir)\lib64\$(SpinnakerLibFlavor);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(SpinnakerLibName);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SpinnakerLibName);delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>$(SpinnakerDllName);%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(SolutionDir)..\..\unity\Assets\Plugins\x86_64" mkdir "$(SolutionDir)..\..\unity\Assets\Plugins\x86_64"

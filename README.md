@@ -38,6 +38,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_native.ps1 -Configurati
 unity\Assets\Plugins\x86_64\SpinnakerUnityBridge.dll
 ```
 
+이 마일스톤에서는 Spinnaker runtime DLL을 Unity 프로젝트에 내장하지 않습니다.
+`SpinnakerUnityBridge.dll`만 Unity plugin으로 복사되며, 실행 PC에는 Spinnaker SDK/runtime이 설치되어 있어야 합니다.
+
 현재 설치 환경은 Spinnaker 기본 C++ import lib가 `lib64\vs2015`에 있으므로 기본값도 `vs2015`입니다. 다른 설치 구성이면:
 
 ```powershell
