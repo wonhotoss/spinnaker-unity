@@ -3,512 +3,480 @@ using System.Globalization;
 using SpinnakerUnity;
 using UnityEngine;
 
-public sealed class SpinnakerPreviewController : MonoBehaviour
-{
-    private const float AutoControlledParameterRefreshIntervalSeconds = 0.5f;
+public sealed class SpinnakerPreviewController : MonoBehaviour {
+    const float auto_controlled_parameter_refresh_interval_seconds = 0.5f;
 
-    private readonly SpinnakerBridge _bridge = new SpinnakerBridge();
-    private byte[] _frameBuffer;
-    private Texture2D _texture;
-    private CameraInfo _cameraInfo;
-    private string _status = "Idle";
-    private string _genericNodeName = "ExposureTime";
-    private string _genericValue = "";
-    private string _genericEntries = "";
-    private double _exposure;
-    private double _exposureMin;
-    private double _exposureMax;
-    private double _gain;
-    private double _gainMin;
-    private double _gainMax;
-    private double _frameRate;
-    private double _frameRateMin;
-    private double _frameRateMax;
-    private double _gamma;
-    private double _gammaMin;
-    private double _gammaMax;
-    private double _redBalance;
-    private double _redBalanceMin;
-    private double _redBalanceMax;
-    private double _blueBalance;
-    private double _blueBalanceMin;
-    private double _blueBalanceMax;
-    private bool _exposureAuto;
-    private bool _gainAuto;
-    private bool _frameRateEnabled;
-    private bool _gammaEnabled;
-    private bool _whiteBalanceAuto;
-    private bool _parametersLoaded;
-    private bool _flipVertical = true;
-    private ulong _lastFrameId;
-    private float _fpsTimer;
-    private int _fpsFrames;
-    private float _fps;
-    private float _autoControlledParameterRefreshTimer;
+    readonly SpinnakerBridge _bridge = new SpinnakerBridge();
+    byte[] _frame_buffer;
+    Texture2D _texture;
+    CameraInfo _camera_info;
+    string _status = "Idle";
+    string _generic_node_name = "ExposureTime";
+    string _generic_value = "";
+    string _generic_entries = "";
+    double _exposure;
+    double _exposure_min;
+    double _exposure_max;
+    double _gain;
+    double _gain_min;
+    double _gain_max;
+    double _frame_rate;
+    double _frame_rate_min;
+    double _frame_rate_max;
+    double _gamma;
+    double _gamma_min;
+    double _gamma_max;
+    double _red_balance;
+    double _red_balance_min;
+    double _red_balance_max;
+    double _blue_balance;
+    double _blue_balance_min;
+    double _blue_balance_max;
+    bool _exposure_auto;
+    bool _gain_auto;
+    bool _frame_rate_enabled;
+    bool _gamma_enabled;
+    bool _white_balance_auto;
+    bool _parameters_loaded;
+    bool _flip_vertical = true;
+    ulong _last_frame_id;
+    float _fps_timer;
+    int _fps_frames;
+    float _fps;
+    float _auto_controlled_parameter_refresh_timer;
 
-    private void Awake()
-    {
+    void Awake() {
         Application.runInBackground = true;
     }
 
-    private void Update()
-    {
-        if (_bridge.IsStreaming)
-        {
-            try
-            {
-                if (_bridge.TryGetLatestFrame(ref _frameBuffer, out SpinnakerFrame frame))
-                {
-                    UpdateTexture(frame);
-                    UpdateFps(frame.FrameId);
+    void Update() {
+        if (_bridge.IsStreaming) {
+            try {
+                if (_bridge.TryGetLatestFrame(ref _frame_buffer, out var frame)) {
+                    update_texture(frame);
+                    update_fps(frame.FrameId);
                 }
-            }
-            catch (Exception exception)
-            {
+            } catch (Exception exception) {
                 _status = exception.Message;
             }
         }
 
-        RefreshAutoControlledParametersIfNeeded();
+        refresh_auto_controlled_parameters_if_needed();
     }
 
-    private void RefreshAutoControlledParametersIfNeeded()
-    {
-        if (!_bridge.IsCameraOpen || !_parametersLoaded)
-        {
-            _autoControlledParameterRefreshTimer = 0f;
+    void refresh_auto_controlled_parameters_if_needed() {
+        if (!_bridge.IsCameraOpen || !_parameters_loaded) {
+            _auto_controlled_parameter_refresh_timer = 0f;
             return;
         }
 
-        if (!HasAutoControlledParameters())
-        {
-            _autoControlledParameterRefreshTimer = 0f;
+        if (!has_auto_controlled_parameters()) {
+            _auto_controlled_parameter_refresh_timer = 0f;
             return;
         }
 
-        _autoControlledParameterRefreshTimer += Time.unscaledDeltaTime;
-        if (_autoControlledParameterRefreshTimer < AutoControlledParameterRefreshIntervalSeconds)
-        {
+        _auto_controlled_parameter_refresh_timer += Time.unscaledDeltaTime;
+        if (_auto_controlled_parameter_refresh_timer < auto_controlled_parameter_refresh_interval_seconds) {
             return;
         }
 
-        _autoControlledParameterRefreshTimer = 0f;
+        _auto_controlled_parameter_refresh_timer = 0f;
 
-        if (_exposureAuto)
-        {
-            ApplyExposure(TryGet(() => _bridge.ExposureTime, new NumericNode(_exposure, _exposureMin, _exposureMax, true, true)));
+        if (_exposure_auto) {
+            apply_exposure(read_exposure());
         }
 
-        if (_gainAuto)
-        {
-            ApplyGain(TryGet(() => _bridge.Gain, new NumericNode(_gain, _gainMin, _gainMax, true, true)));
+        if (_gain_auto) {
+            apply_gain(read_gain());
         }
 
-        if (_whiteBalanceAuto)
-        {
-            ApplyRedBalance(TryGet(() => _bridge.GetBalanceRatio("Red"), new NumericNode(_redBalance, _redBalanceMin, _redBalanceMax, true, true)));
-            ApplyBlueBalance(TryGet(() => _bridge.GetBalanceRatio("Blue"), new NumericNode(_blueBalance, _blueBalanceMin, _blueBalanceMax, true, true)));
+        if (_white_balance_auto) {
+            apply_red_balance(read_red_balance());
+            apply_blue_balance(read_blue_balance());
         }
     }
 
-    private bool HasAutoControlledParameters()
-    {
-        return _exposureAuto || _gainAuto || _whiteBalanceAuto;
+    bool has_auto_controlled_parameters() {
+        return _exposure_auto || _gain_auto || _white_balance_auto;
     }
 
-    private void OnGUI()
-    {
-        const float panelWidth = 390f;
-        Rect previewRect = new Rect(0f, 0f, Screen.width - panelWidth, Screen.height);
-        Rect panelRect = new Rect(Screen.width - panelWidth, 0f, panelWidth, Screen.height);
+    void OnGUI() {
+        const float panel_width = 390f;
+        var preview_rect = new Rect(0f, 0f, Screen.width - panel_width, Screen.height);
+        var panel_rect = new Rect(Screen.width - panel_width, 0f, panel_width, Screen.height);
 
-        GUI.Box(panelRect, GUIContent.none);
-        DrawPreview(previewRect);
-        DrawControls(panelRect);
+        GUI.Box(panel_rect, GUIContent.none);
+        draw_preview(preview_rect);
+        draw_controls(panel_rect);
     }
 
-    private void OnDestroy()
-    {
-        try
-        {
+    void OnDestroy() {
+        try {
             _bridge.Dispose();
-        }
-        catch
-        {
+        } catch {
             // Unity may tear down native plugins while leaving managed objects alive.
         }
     }
 
-    private void DrawPreview(Rect rect)
-    {
-        if (_texture == null)
-        {
+    void draw_preview(Rect rect) {
+        if (_texture == null) {
             GUI.Label(new Rect(rect.x + 24f, rect.y + 24f, rect.width - 48f, 32f), "No frame");
             return;
         }
 
-        Rect texCoords = _flipVertical ? new Rect(0f, 1f, 1f, -1f) : new Rect(0f, 0f, 1f, 1f);
-        GUI.DrawTextureWithTexCoords(rect, _texture, texCoords, true);
+        var tex_coords = _flip_vertical ? new Rect(0f, 1f, 1f, -1f) : new Rect(0f, 0f, 1f, 1f);
+        GUI.DrawTextureWithTexCoords(rect, _texture, tex_coords, true);
     }
 
-    private void DrawControls(Rect panelRect)
-    {
-        GUILayout.BeginArea(new Rect(panelRect.x + 14f, panelRect.y + 12f, panelRect.width - 28f, panelRect.height - 24f));
+    void draw_controls(Rect panel_rect) {
+        GUILayout.BeginArea(new Rect(panel_rect.x + 14f, panel_rect.y + 12f, panel_rect.width - 28f, panel_rect.height - 24f));
         GUILayout.Label("Spinnaker Unity Bridge");
         GUILayout.Space(8f);
 
         GUILayout.Label($"Status: {_status}");
-        GUILayout.Label($"Camera: {(_bridge.IsCameraOpen ? _cameraInfo.ToString() : "-")}");
+        GUILayout.Label($"Camera: {(_bridge.IsCameraOpen ? _camera_info.ToString() : "-")}");
         GUILayout.Label($"Stream: {(_bridge.IsStreaming ? "Running" : "Stopped")} / FPS {_fps:0.0}");
         GUILayout.Space(8f);
 
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Initialize"))
-        {
-            RunAction(Initialize);
+        if (GUILayout.Button("Initialize")) {
+            run_action(initialize);
         }
-        if (GUILayout.Button("Open First"))
-        {
-            RunAction(OpenFirst);
+
+        if (GUILayout.Button("Open First")) {
+            run_action(open_first);
         }
+
         GUILayout.EndHorizontal();
 
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button(_bridge.IsStreaming ? "Stop" : "Start"))
-        {
-            RunAction(ToggleStream);
+        if (GUILayout.Button(_bridge.IsStreaming ? "Stop" : "Start")) {
+            run_action(toggle_stream);
         }
-        if (GUILayout.Button("Refresh Params"))
-        {
-            RunAction(RefreshParameters);
+
+        if (GUILayout.Button("Refresh Params")) {
+            run_action(refresh_parameters);
         }
+
         GUILayout.EndHorizontal();
 
-        _flipVertical = GUILayout.Toggle(_flipVertical, "Flip preview vertically");
+        _flip_vertical = GUILayout.Toggle(_flip_vertical, "Flip preview vertically");
 
         GUILayout.Space(12f);
-        DrawParameterSection();
+        draw_parameter_section();
         GUILayout.Space(12f);
-        DrawGenericNodeSection();
+        draw_generic_node_section();
         GUILayout.EndArea();
     }
 
-    private void DrawParameterSection()
-    {
+    void draw_parameter_section() {
         GUILayout.Label("Camera Parameters");
 
-        bool nextExposureAuto = GUILayout.Toggle(_exposureAuto, "Exposure Auto");
-        if (nextExposureAuto != _exposureAuto)
-        {
-            RunAction(() => SetExposureAuto(nextExposureAuto));
+        var next_exposure_auto = GUILayout.Toggle(_exposure_auto, "Exposure Auto");
+        if (next_exposure_auto != _exposure_auto) {
+            run_action(() => set_exposure_auto(next_exposure_auto));
         }
-        _exposure = DrawSlider("Exposure us", _exposure, _exposureMin, _exposureMax, !_exposureAuto, value => _bridge.SetExposureTime(value));
 
-        bool nextGainAuto = GUILayout.Toggle(_gainAuto, "Gain Auto");
-        if (nextGainAuto != _gainAuto)
-        {
-            RunAction(() => SetGainAuto(nextGainAuto));
+        _exposure = draw_slider("Exposure us", _exposure, _exposure_min, _exposure_max, !_exposure_auto, value => _bridge.SetExposureTime(value));
+
+        var next_gain_auto = GUILayout.Toggle(_gain_auto, "Gain Auto");
+        if (next_gain_auto != _gain_auto) {
+            run_action(() => set_gain_auto(next_gain_auto));
         }
-        _gain = DrawSlider("Gain dB", _gain, _gainMin, _gainMax, !_gainAuto, value => _bridge.SetGain(value));
 
-        bool nextFrameRateEnabled = GUILayout.Toggle(_frameRateEnabled, "Frame Rate Enable");
-        if (nextFrameRateEnabled != _frameRateEnabled)
-        {
-            RunAction(() => SetFrameRateEnabled(nextFrameRateEnabled));
+        _gain = draw_slider("Gain dB", _gain, _gain_min, _gain_max, !_gain_auto, value => _bridge.SetGain(value));
+
+        var next_frame_rate_enabled = GUILayout.Toggle(_frame_rate_enabled, "Frame Rate Enable");
+        if (next_frame_rate_enabled != _frame_rate_enabled) {
+            run_action(() => set_frame_rate_enabled(next_frame_rate_enabled));
         }
-        _frameRate = DrawSlider("Frame Rate", _frameRate, _frameRateMin, _frameRateMax, _frameRateEnabled, value => _bridge.SetFrameRate(value));
 
-        bool nextGammaEnabled = GUILayout.Toggle(_gammaEnabled, "Gamma Enable");
-        if (nextGammaEnabled != _gammaEnabled)
-        {
-            RunAction(() => SetGammaEnabled(nextGammaEnabled));
+        _frame_rate = draw_slider("Frame Rate", _frame_rate, _frame_rate_min, _frame_rate_max, _frame_rate_enabled, value => _bridge.SetFrameRate(value));
+
+        var next_gamma_enabled = GUILayout.Toggle(_gamma_enabled, "Gamma Enable");
+        if (next_gamma_enabled != _gamma_enabled) {
+            run_action(() => set_gamma_enabled(next_gamma_enabled));
         }
-        _gamma = DrawSlider("Gamma", _gamma, _gammaMin, _gammaMax, _gammaEnabled, value => _bridge.SetGamma(value));
 
-        bool nextWhiteAuto = GUILayout.Toggle(_whiteBalanceAuto, "White Balance Auto");
-        if (nextWhiteAuto != _whiteBalanceAuto)
-        {
-            RunAction(() => SetWhiteBalanceAuto(nextWhiteAuto));
+        _gamma = draw_slider("Gamma", _gamma, _gamma_min, _gamma_max, _gamma_enabled, value => _bridge.SetGamma(value));
+
+        var next_white_auto = GUILayout.Toggle(_white_balance_auto, "White Balance Auto");
+        if (next_white_auto != _white_balance_auto) {
+            run_action(() => set_white_balance_auto(next_white_auto));
         }
-        _redBalance = DrawSlider("WB Red", _redBalance, _redBalanceMin, _redBalanceMax, !_whiteBalanceAuto, value => _bridge.SetBalanceRatio("Red", value));
-        _blueBalance = DrawSlider("WB Blue", _blueBalance, _blueBalanceMin, _blueBalanceMax, !_whiteBalanceAuto, value => _bridge.SetBalanceRatio("Blue", value));
 
-        if (!_parametersLoaded)
-        {
+        _red_balance = draw_slider("WB Red", _red_balance, _red_balance_min, _red_balance_max, !_white_balance_auto, value => _bridge.SetBalanceRatio("Red", value));
+        _blue_balance = draw_slider("WB Blue", _blue_balance, _blue_balance_min, _blue_balance_max, !_white_balance_auto, value => _bridge.SetBalanceRatio("Blue", value));
+
+        if (!_parameters_loaded) {
             GUILayout.Label("Open a camera, then refresh parameters.");
         }
     }
 
-    private double DrawSlider(string label, double value, double minimum, double maximum, bool enabled, Action<double> setter)
-    {
+    double draw_slider(string label, double value, double minimum, double maximum, bool enabled, Action<double> setter) {
         GUILayout.Label($"{label}: {value:0.###} [{minimum:0.###} - {maximum:0.###}]");
-        using (new GuiEnabledScope(enabled && maximum > minimum))
-        {
-            float next = GUILayout.HorizontalSlider((float)value, (float)minimum, (float)maximum);
-            if (Math.Abs(next - value) > Math.Max(0.0001, (maximum - minimum) * 0.0005))
-            {
-                double nextValue = next;
-                value = nextValue;
-                RunAction(() => setter(nextValue), refreshAfter: false);
+        using (new gui_enabled_scope(enabled && maximum > minimum)) {
+            var next = GUILayout.HorizontalSlider((float)value, (float)minimum, (float)maximum);
+            if (Math.Abs(next - value) > Math.Max(0.0001, (maximum - minimum) * 0.0005)) {
+                var next_value = next;
+                value = next_value;
+                run_action_without_refresh(() => setter(next_value));
             }
         }
 
         return value;
     }
 
-    private void DrawGenericNodeSection()
-    {
+    void draw_generic_node_section() {
         GUILayout.Label("Generic GenICam Node");
         GUILayout.Label("Node");
-        _genericNodeName = GUILayout.TextField(_genericNodeName);
+        _generic_node_name = GUILayout.TextField(_generic_node_name);
         GUILayout.Label("Value / Entry");
-        _genericValue = GUILayout.TextField(_genericValue);
+        _generic_value = GUILayout.TextField(_generic_value);
 
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Get Float"))
-        {
-            RunAction(() =>
-            {
-                NumericNode node = _bridge.GetFloatNode(_genericNodeName);
-                _genericValue = node.Value.ToString(CultureInfo.InvariantCulture);
-                _status = $"{_genericNodeName}: {node.Value:0.###}";
-            }, refreshAfter: false);
+        if (GUILayout.Button("Get Float")) {
+            run_action_without_refresh(() => {
+                var node = _bridge.GetFloatNode(_generic_node_name);
+                _generic_value = node.Value.ToString(CultureInfo.InvariantCulture);
+                _status = $"{_generic_node_name}: {node.Value:0.###}";
+            });
         }
-        if (GUILayout.Button("Set Float"))
-        {
-            RunAction(() =>
-            {
-                if (double.TryParse(_genericValue, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
-                {
-                    _bridge.SetFloatNode(_genericNodeName, value);
+
+        if (GUILayout.Button("Set Float")) {
+            run_action(() => {
+                if (double.TryParse(_generic_value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)) {
+                    _bridge.SetFloatNode(_generic_node_name, value);
                 }
             });
         }
+
         GUILayout.EndHorizontal();
 
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Get Enum"))
-        {
-            RunAction(() =>
-            {
-                EnumNode node = _bridge.GetEnumNode(_genericNodeName);
-                _genericValue = node.Value;
-                _genericEntries = string.Join(", ", _bridge.GetEnumEntries(_genericNodeName));
-                _status = $"{_genericNodeName}: {node.Value}";
-            }, refreshAfter: false);
+        if (GUILayout.Button("Get Enum")) {
+            run_action_without_refresh(() => {
+                var node = _bridge.GetEnumNode(_generic_node_name);
+                _generic_value = node.Value;
+                _generic_entries = string.Join(", ", _bridge.GetEnumEntries(_generic_node_name));
+                _status = $"{_generic_node_name}: {node.Value}";
+            });
         }
-        if (GUILayout.Button("Set Enum"))
-        {
-            RunAction(() => _bridge.SetEnumNode(_genericNodeName, _genericValue));
+
+        if (GUILayout.Button("Set Enum")) {
+            run_action(() => _bridge.SetEnumNode(_generic_node_name, _generic_value));
         }
+
         GUILayout.EndHorizontal();
 
-        if (!string.IsNullOrEmpty(_genericEntries))
-        {
-            GUILayout.Label(_genericEntries);
+        if (!string.IsNullOrEmpty(_generic_entries)) {
+            GUILayout.Label(_generic_entries);
         }
     }
 
-    private void Initialize()
-    {
+    void initialize() {
         _bridge.Initialize();
         _bridge.RefreshCameras();
-        int count = _bridge.CameraCount;
+        var count = _bridge.CameraCount;
         _status = $"Initialized. Cameras: {count}";
     }
 
-    private void OpenFirst()
-    {
-        if (!_bridge.IsInitialized)
-        {
-            Initialize();
+    void open_first() {
+        if (!_bridge.IsInitialized) {
+            initialize();
         }
 
-        if (!_bridge.IsCameraOpen)
-        {
+        if (!_bridge.IsCameraOpen) {
             _bridge.OpenFirstCamera();
         }
 
-        _cameraInfo = _bridge.CameraCount > 0 ? _bridge.GetCameraInfo(0) : default;
-        RefreshParameters();
-        _status = $"Opened {_cameraInfo}";
+        _camera_info = _bridge.CameraCount > 0 ? _bridge.GetCameraInfo(0) : default;
+        refresh_parameters();
+        _status = $"Opened {_camera_info}";
     }
 
-    private void ToggleStream()
-    {
-        if (_bridge.IsStreaming)
-        {
+    void toggle_stream() {
+        if (_bridge.IsStreaming) {
             _bridge.StopStream();
             _status = "Stream stopped";
-        }
-        else
-        {
+        } else {
             _bridge.StartStream();
             _status = "Stream started";
         }
     }
 
-    private void RefreshParameters()
-    {
-        _exposureAuto = TryGet(() => _bridge.ExposureAuto, _exposureAuto);
-        ApplyExposure(TryGet(() => _bridge.ExposureTime, new NumericNode(_exposure, _exposureMin, _exposureMax, true, true)));
+    void refresh_parameters() {
+        _exposure_auto = try_get(() => _bridge.ExposureAuto, _exposure_auto);
+        apply_exposure(read_exposure());
 
-        _gainAuto = TryGet(() => _bridge.GainAuto, _gainAuto);
-        ApplyGain(TryGet(() => _bridge.Gain, new NumericNode(_gain, _gainMin, _gainMax, true, true)));
+        _gain_auto = try_get(() => _bridge.GainAuto, _gain_auto);
+        apply_gain(read_gain());
 
-        _frameRateEnabled = TryGet(() => _bridge.FrameRateEnabled, _frameRateEnabled);
-        NumericNode frameRate = TryGet(() => _bridge.FrameRate, new NumericNode(_frameRate, _frameRateMin, _frameRateMax, true, true));
-        _frameRate = frameRate.Value;
-        _frameRateMin = frameRate.Minimum;
-        _frameRateMax = frameRate.Maximum;
+        _frame_rate_enabled = try_get(() => _bridge.FrameRateEnabled, _frame_rate_enabled);
+        apply_frame_rate(read_frame_rate());
 
-        _gammaEnabled = TryGet(() => _bridge.GammaEnabled, _gammaEnabled);
-        NumericNode gamma = TryGet(() => _bridge.Gamma, new NumericNode(_gamma, _gammaMin, _gammaMax, true, true));
-        _gamma = gamma.Value;
-        _gammaMin = gamma.Minimum;
-        _gammaMax = gamma.Maximum;
+        _gamma_enabled = try_get(() => _bridge.GammaEnabled, _gamma_enabled);
+        apply_gamma(read_gamma());
 
-        _whiteBalanceAuto = TryGet(() => _bridge.WhiteBalanceAuto, _whiteBalanceAuto);
-        ApplyRedBalance(TryGet(() => _bridge.GetBalanceRatio("Red"), new NumericNode(_redBalance, _redBalanceMin, _redBalanceMax, true, true)));
-        ApplyBlueBalance(TryGet(() => _bridge.GetBalanceRatio("Blue"), new NumericNode(_blueBalance, _blueBalanceMin, _blueBalanceMax, true, true)));
+        _white_balance_auto = try_get(() => _bridge.WhiteBalanceAuto, _white_balance_auto);
+        apply_red_balance(read_red_balance());
+        apply_blue_balance(read_blue_balance());
 
-        _parametersLoaded = true;
+        _parameters_loaded = true;
     }
 
-    private void ApplyExposure(NumericNode exposure)
-    {
+    NumericNode read_exposure() {
+        return try_get(() => _bridge.ExposureTime, new NumericNode(_exposure, _exposure_min, _exposure_max, true, true));
+    }
+
+    NumericNode read_gain() {
+        return try_get(() => _bridge.Gain, new NumericNode(_gain, _gain_min, _gain_max, true, true));
+    }
+
+    NumericNode read_frame_rate() {
+        return try_get(() => _bridge.FrameRate, new NumericNode(_frame_rate, _frame_rate_min, _frame_rate_max, true, true));
+    }
+
+    NumericNode read_gamma() {
+        return try_get(() => _bridge.Gamma, new NumericNode(_gamma, _gamma_min, _gamma_max, true, true));
+    }
+
+    NumericNode read_red_balance() {
+        return try_get(() => _bridge.GetBalanceRatio("Red"), new NumericNode(_red_balance, _red_balance_min, _red_balance_max, true, true));
+    }
+
+    NumericNode read_blue_balance() {
+        return try_get(() => _bridge.GetBalanceRatio("Blue"), new NumericNode(_blue_balance, _blue_balance_min, _blue_balance_max, true, true));
+    }
+
+    void apply_exposure(NumericNode exposure) {
         _exposure = exposure.Value;
-        _exposureMin = exposure.Minimum;
-        _exposureMax = exposure.Maximum;
+        _exposure_min = exposure.Minimum;
+        _exposure_max = exposure.Maximum;
     }
 
-    private void ApplyGain(NumericNode gain)
-    {
+    void apply_gain(NumericNode gain) {
         _gain = gain.Value;
-        _gainMin = gain.Minimum;
-        _gainMax = gain.Maximum;
+        _gain_min = gain.Minimum;
+        _gain_max = gain.Maximum;
     }
 
-    private void ApplyRedBalance(NumericNode red)
-    {
-        _redBalance = red.Value;
-        _redBalanceMin = red.Minimum;
-        _redBalanceMax = red.Maximum;
+    void apply_frame_rate(NumericNode frame_rate) {
+        _frame_rate = frame_rate.Value;
+        _frame_rate_min = frame_rate.Minimum;
+        _frame_rate_max = frame_rate.Maximum;
     }
 
-    private void ApplyBlueBalance(NumericNode blue)
-    {
-        _blueBalance = blue.Value;
-        _blueBalanceMin = blue.Minimum;
-        _blueBalanceMax = blue.Maximum;
+    void apply_gamma(NumericNode gamma) {
+        _gamma = gamma.Value;
+        _gamma_min = gamma.Minimum;
+        _gamma_max = gamma.Maximum;
     }
 
-    private void SetExposureAuto(bool enabled)
-    {
+    void apply_red_balance(NumericNode red) {
+        _red_balance = red.Value;
+        _red_balance_min = red.Minimum;
+        _red_balance_max = red.Maximum;
+    }
+
+    void apply_blue_balance(NumericNode blue) {
+        _blue_balance = blue.Value;
+        _blue_balance_min = blue.Minimum;
+        _blue_balance_max = blue.Maximum;
+    }
+
+    void set_exposure_auto(bool enabled) {
         _bridge.ExposureAuto = enabled;
-        _exposureAuto = enabled;
+        _exposure_auto = enabled;
     }
 
-    private void SetGainAuto(bool enabled)
-    {
+    void set_gain_auto(bool enabled) {
         _bridge.GainAuto = enabled;
-        _gainAuto = enabled;
+        _gain_auto = enabled;
     }
 
-    private void SetFrameRateEnabled(bool enabled)
-    {
+    void set_frame_rate_enabled(bool enabled) {
         _bridge.FrameRateEnabled = enabled;
-        _frameRateEnabled = enabled;
+        _frame_rate_enabled = enabled;
     }
 
-    private void SetGammaEnabled(bool enabled)
-    {
+    void set_gamma_enabled(bool enabled) {
         _bridge.GammaEnabled = enabled;
-        _gammaEnabled = enabled;
+        _gamma_enabled = enabled;
     }
 
-    private void SetWhiteBalanceAuto(bool enabled)
-    {
+    void set_white_balance_auto(bool enabled) {
         _bridge.WhiteBalanceAuto = enabled;
-        _whiteBalanceAuto = enabled;
+        _white_balance_auto = enabled;
     }
 
-    private void UpdateTexture(SpinnakerFrame frame)
-    {
-        if (_texture == null || _texture.width != frame.Width || _texture.height != frame.Height)
-        {
-            if (_texture != null)
-            {
+    void update_texture(SpinnakerFrame frame) {
+        if (_texture == null || _texture.width != frame.Width || _texture.height != frame.Height) {
+            if (_texture != null) {
                 Destroy(_texture);
             }
 
-            _texture = new Texture2D(frame.Width, frame.Height, TextureFormat.RGB24, false);
-            _texture.wrapMode = TextureWrapMode.Clamp;
-            _texture.filterMode = FilterMode.Bilinear;
+            _texture = new Texture2D(frame.Width, frame.Height, TextureFormat.RGB24, false) {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
         }
 
         _texture.LoadRawTextureData(frame.Data);
         _texture.Apply(false);
     }
 
-    private void UpdateFps(ulong frameId)
-    {
-        if (frameId == _lastFrameId)
-        {
+    void update_fps(ulong frame_id) {
+        if (frame_id == _last_frame_id) {
             return;
         }
 
-        _lastFrameId = frameId;
-        _fpsFrames++;
-        _fpsTimer += Time.unscaledDeltaTime;
-        if (_fpsTimer >= 0.5f)
-        {
-            _fps = _fpsFrames / _fpsTimer;
-            _fpsFrames = 0;
-            _fpsTimer = 0f;
+        _last_frame_id = frame_id;
+        _fps_frames++;
+        _fps_timer += Time.unscaledDeltaTime;
+        if (_fps_timer >= 0.5f) {
+            _fps = _fps_frames / _fps_timer;
+            _fps_frames = 0;
+            _fps_timer = 0f;
         }
     }
 
-    private void RunAction(Action action, bool refreshAfter = true)
-    {
-        try
-        {
+    void run_action(Action action) {
+        try {
             action();
-            if (refreshAfter && _bridge.IsCameraOpen)
-            {
-                RefreshParameters();
+            if (_bridge.IsCameraOpen) {
+                refresh_parameters();
             }
-        }
-        catch (Exception exception)
-        {
+        } catch (Exception exception) {
             _status = exception.Message;
         }
     }
 
-    private static T TryGet<T>(Func<T> getter, T fallback)
-    {
-        try
-        {
-            return getter();
+    void run_action_without_refresh(Action action) {
+        try {
+            action();
+        } catch (Exception exception) {
+            _status = exception.Message;
         }
-        catch
-        {
+    }
+
+    static T try_get<T>(Func<T> getter, T fallback) {
+        try {
+            return getter();
+        } catch {
             return fallback;
         }
     }
 
-    private readonly struct GuiEnabledScope : IDisposable
-    {
-        private readonly bool _previous;
+    readonly struct gui_enabled_scope : IDisposable {
+        readonly bool _previous;
 
-        public GuiEnabledScope(bool enabled)
-        {
+        public gui_enabled_scope(bool enabled) {
             _previous = GUI.enabled;
             GUI.enabled = enabled;
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             GUI.enabled = _previous;
         }
     }
