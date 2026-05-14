@@ -155,36 +155,36 @@ public sealed class SpinnakerPreviewController : MonoBehaviour
         {
             RunAction(() => SetExposureAuto(nextExposureAuto));
         }
-        DrawSlider("Exposure us", ref _exposure, _exposureMin, _exposureMax, !_exposureAuto, value => _bridge.SetExposureTime(value));
+        _exposure = DrawSlider("Exposure us", _exposure, _exposureMin, _exposureMax, !_exposureAuto, value => _bridge.SetExposureTime(value));
 
         bool nextGainAuto = GUILayout.Toggle(_gainAuto, "Gain Auto");
         if (nextGainAuto != _gainAuto)
         {
             RunAction(() => SetGainAuto(nextGainAuto));
         }
-        DrawSlider("Gain dB", ref _gain, _gainMin, _gainMax, !_gainAuto, value => _bridge.SetGain(value));
+        _gain = DrawSlider("Gain dB", _gain, _gainMin, _gainMax, !_gainAuto, value => _bridge.SetGain(value));
 
         bool nextFrameRateEnabled = GUILayout.Toggle(_frameRateEnabled, "Frame Rate Enable");
         if (nextFrameRateEnabled != _frameRateEnabled)
         {
             RunAction(() => SetFrameRateEnabled(nextFrameRateEnabled));
         }
-        DrawSlider("Frame Rate", ref _frameRate, _frameRateMin, _frameRateMax, _frameRateEnabled, value => _bridge.SetFrameRate(value));
+        _frameRate = DrawSlider("Frame Rate", _frameRate, _frameRateMin, _frameRateMax, _frameRateEnabled, value => _bridge.SetFrameRate(value));
 
         bool nextGammaEnabled = GUILayout.Toggle(_gammaEnabled, "Gamma Enable");
         if (nextGammaEnabled != _gammaEnabled)
         {
             RunAction(() => SetGammaEnabled(nextGammaEnabled));
         }
-        DrawSlider("Gamma", ref _gamma, _gammaMin, _gammaMax, _gammaEnabled, value => _bridge.SetGamma(value));
+        _gamma = DrawSlider("Gamma", _gamma, _gammaMin, _gammaMax, _gammaEnabled, value => _bridge.SetGamma(value));
 
         bool nextWhiteAuto = GUILayout.Toggle(_whiteBalanceAuto, "White Balance Auto");
         if (nextWhiteAuto != _whiteBalanceAuto)
         {
             RunAction(() => SetWhiteBalanceAuto(nextWhiteAuto));
         }
-        DrawSlider("WB Red", ref _redBalance, _redBalanceMin, _redBalanceMax, !_whiteBalanceAuto, value => _bridge.SetBalanceRatio("Red", value));
-        DrawSlider("WB Blue", ref _blueBalance, _blueBalanceMin, _blueBalanceMax, !_whiteBalanceAuto, value => _bridge.SetBalanceRatio("Blue", value));
+        _redBalance = DrawSlider("WB Red", _redBalance, _redBalanceMin, _redBalanceMax, !_whiteBalanceAuto, value => _bridge.SetBalanceRatio("Red", value));
+        _blueBalance = DrawSlider("WB Blue", _blueBalance, _blueBalanceMin, _blueBalanceMax, !_whiteBalanceAuto, value => _bridge.SetBalanceRatio("Blue", value));
 
         if (!_parametersLoaded)
         {
@@ -192,7 +192,7 @@ public sealed class SpinnakerPreviewController : MonoBehaviour
         }
     }
 
-    private void DrawSlider(string label, ref double value, double minimum, double maximum, bool enabled, Action<double> setter)
+    private double DrawSlider(string label, double value, double minimum, double maximum, bool enabled, Action<double> setter)
     {
         GUILayout.Label($"{label}: {value:0.###} [{minimum:0.###} - {maximum:0.###}]");
         using (new GuiEnabledScope(enabled && maximum > minimum))
@@ -200,10 +200,13 @@ public sealed class SpinnakerPreviewController : MonoBehaviour
             float next = GUILayout.HorizontalSlider((float)value, (float)minimum, (float)maximum);
             if (Math.Abs(next - value) > Math.Max(0.0001, (maximum - minimum) * 0.0005))
             {
-                value = next;
-                RunAction(() => setter(value), refreshAfter: false);
+                double nextValue = next;
+                value = nextValue;
+                RunAction(() => setter(nextValue), refreshAfter: false);
             }
         }
+
+        return value;
     }
 
     private void DrawGenericNodeSection()

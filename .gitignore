@@ -8,5 +8,3 @@ unity/Obj/
 unity/Build/
 unity/Builds/
 unity/UserSettings/
-unity/Assets/Plugins/x86_64/*.dll
-unity/Assets/Plugins/x86_64/*.pdb
