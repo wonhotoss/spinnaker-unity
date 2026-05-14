@@ -134,7 +134,7 @@ std::string get_string_node(INodeMap& nodeMap, const char* nodeName)
         return "";
     }
 
-    return node->ToString().c_str();
+    return node->ToString(false, true).c_str();
 }
 
 int set_enum_if_available(INodeMap& nodeMap, const char* nodeName, const char* entryName, bool failIfUnavailable)
@@ -309,7 +309,7 @@ int get_float_node_internal(const char* nodeName, double* value, double* minimum
         return SUB_NODE_UNAVAILABLE;
     }
 
-    *value = node->GetValue();
+    *value = node->GetValue(false, true);
     *minimum = node->GetMin();
     *maximum = node->GetMax();
     return SUB_OK;
@@ -793,7 +793,7 @@ int sub_get_int_node(
             return SUB_NODE_UNAVAILABLE;
         }
 
-        *value = node->GetValue();
+        *value = node->GetValue(false, true);
         *minimum = node->GetMin();
         *maximum = node->GetMax();
         return SUB_OK;
@@ -878,7 +878,7 @@ int sub_get_bool_node(const char* nodeName, int* value, int* readable, int* writ
             return SUB_NODE_UNAVAILABLE;
         }
 
-        *value = node->GetValue() ? 1 : 0;
+        *value = node->GetValue(false, true) ? 1 : 0;
         return SUB_OK;
     }
     catch (const Spinnaker::Exception& exception)
@@ -952,7 +952,7 @@ int sub_get_enum_node(
             return SUB_NODE_UNAVAILABLE;
         }
 
-        CEnumEntryPtr current = node->GetCurrentEntry();
+        CEnumEntryPtr current = node->GetCurrentEntry(false, true);
         if (!IsReadable(current))
         {
             set_error(std::string("Current enum entry is not readable: ") + nodeName);

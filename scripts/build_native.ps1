@@ -47,4 +47,15 @@ if (-not (Test-Path $plugin)) {
     throw "Build finished, but Unity plugin was not copied: $plugin"
 }
 
+$built = Join-Path $root "native\SpinnakerUnityBridge\bin\x64\$Configuration\SpinnakerUnityBridge.dll"
+if (-not (Test-Path $built)) {
+    throw "Build finished, but native output was not found: $built"
+}
+
+$builtHash = (Get-FileHash $built).Hash
+$pluginHash = (Get-FileHash $plugin).Hash
+if ($builtHash -ne $pluginHash) {
+    throw "Build finished, but Unity plugin DLL is stale or locked: $plugin"
+}
+
 Write-Host "Built and copied: $plugin"

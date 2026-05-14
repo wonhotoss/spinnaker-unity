@@ -5,6 +5,8 @@ using UnityEngine;
 
 public sealed class SpinnakerPreviewController : MonoBehaviour
 {
+    private const float AutoControlledParameterRefreshIntervalSeconds = 0.5f;
+
     private readonly SpinnakerBridge _bridge = new SpinnakerBridge();
     private byte[] _frameBuffer;
     private Texture2D _texture;
@@ -42,6 +44,7 @@ public sealed class SpinnakerPreviewController : MonoBehaviour
     private float _fpsTimer;
     private int _fpsFrames;
     private float _fps;
+    private float _autoControlledParameterRefreshTimer;
 
     private void Awake()
     {
@@ -50,23 +53,67 @@ public sealed class SpinnakerPreviewController : MonoBehaviour
 
     private void Update()
     {
-        if (!_bridge.IsStreaming)
+        if (_bridge.IsStreaming)
+        {
+            try
+            {
+                if (_bridge.TryGetLatestFrame(ref _frameBuffer, out SpinnakerFrame frame))
+                {
+                    UpdateTexture(frame);
+                    UpdateFps(frame.FrameId);
+                }
+            }
+            catch (Exception exception)
+            {
+                _status = exception.Message;
+            }
+        }
+
+        RefreshAutoControlledParametersIfNeeded();
+    }
+
+    private void RefreshAutoControlledParametersIfNeeded()
+    {
+        if (!_bridge.IsCameraOpen || !_parametersLoaded)
+        {
+            _autoControlledParameterRefreshTimer = 0f;
+            return;
+        }
+
+        if (!HasAutoControlledParameters())
+        {
+            _autoControlledParameterRefreshTimer = 0f;
+            return;
+        }
+
+        _autoControlledParameterRefreshTimer += Time.unscaledDeltaTime;
+        if (_autoControlledParameterRefreshTimer < AutoControlledParameterRefreshIntervalSeconds)
         {
             return;
         }
 
-        try
+        _autoControlledParameterRefreshTimer = 0f;
+
+        if (_exposureAuto)
         {
-            if (_bridge.TryGetLatestFrame(ref _frameBuffer, out SpinnakerFrame frame))
-            {
-                UpdateTexture(frame);
-                UpdateFps(frame.FrameId);
-            }
+            ApplyExposure(TryGet(() => _bridge.ExposureTime, new NumericNode(_exposure, _exposureMin, _exposureMax, true, true)));
         }
-        catch (Exception exception)
+
+        if (_gainAuto)
         {
-            _status = exception.Message;
+            ApplyGain(TryGet(() => _bridge.Gain, new NumericNode(_gain, _gainMin, _gainMax, true, true)));
         }
+
+        if (_whiteBalanceAuto)
+        {
+            ApplyRedBalance(TryGet(() => _bridge.GetBalanceRatio("Red"), new NumericNode(_redBalance, _redBalanceMin, _redBalanceMax, true, true)));
+            ApplyBlueBalance(TryGet(() => _bridge.GetBalanceRatio("Blue"), new NumericNode(_blueBalance, _blueBalanceMin, _blueBalanceMax, true, true)));
+        }
+    }
+
+    private bool HasAutoControlledParameters()
+    {
+        return _exposureAuto || _gainAuto || _whiteBalanceAuto;
     }
 
     private void OnGUI()
@@ -304,16 +351,10 @@ public sealed class SpinnakerPreviewController : MonoBehaviour
     private void RefreshParameters()
     {
         _exposureAuto = TryGet(() => _bridge.ExposureAuto, _exposureAuto);
-        NumericNode exposure = TryGet(() => _bridge.ExposureTime, new NumericNode(_exposure, _exposureMin, _exposureMax, true, true));
-        _exposure = exposure.Value;
-        _exposureMin = exposure.Minimum;
-        _exposureMax = exposure.Maximum;
+        ApplyExposure(TryGet(() => _bridge.ExposureTime, new NumericNode(_exposure, _exposureMin, _exposureMax, true, true)));
 
         _gainAuto = TryGet(() => _bridge.GainAuto, _gainAuto);
-        NumericNode gain = TryGet(() => _bridge.Gain, new NumericNode(_gain, _gainMin, _gainMax, true, true));
-        _gain = gain.Value;
-        _gainMin = gain.Minimum;
-        _gainMax = gain.Maximum;
+        ApplyGain(TryGet(() => _bridge.Gain, new NumericNode(_gain, _gainMin, _gainMax, true, true)));
 
         _frameRateEnabled = TryGet(() => _bridge.FrameRateEnabled, _frameRateEnabled);
         NumericNode frameRate = TryGet(() => _bridge.FrameRate, new NumericNode(_frameRate, _frameRateMin, _frameRateMax, true, true));
@@ -328,17 +369,38 @@ public sealed class SpinnakerPreviewController : MonoBehaviour
         _gammaMax = gamma.Maximum;
 
         _whiteBalanceAuto = TryGet(() => _bridge.WhiteBalanceAuto, _whiteBalanceAuto);
-        NumericNode red = TryGet(() => _bridge.GetBalanceRatio("Red"), new NumericNode(_redBalance, _redBalanceMin, _redBalanceMax, true, true));
+        ApplyRedBalance(TryGet(() => _bridge.GetBalanceRatio("Red"), new NumericNode(_redBalance, _redBalanceMin, _redBalanceMax, true, true)));
+        ApplyBlueBalance(TryGet(() => _bridge.GetBalanceRatio("Blue"), new NumericNode(_blueBalance, _blueBalanceMin, _blueBalanceMax, true, true)));
+
+        _parametersLoaded = true;
+    }
+
+    private void ApplyExposure(NumericNode exposure)
+    {
+        _exposure = exposure.Value;
+        _exposureMin = exposure.Minimum;
+        _exposureMax = exposure.Maximum;
+    }
+
+    private void ApplyGain(NumericNode gain)
+    {
+        _gain = gain.Value;
+        _gainMin = gain.Minimum;
+        _gainMax = gain.Maximum;
+    }
+
+    private void ApplyRedBalance(NumericNode red)
+    {
         _redBalance = red.Value;
         _redBalanceMin = red.Minimum;
         _redBalanceMax = red.Maximum;
+    }
 
-        NumericNode blue = TryGet(() => _bridge.GetBalanceRatio("Blue"), new NumericNode(_blueBalance, _blueBalanceMin, _blueBalanceMax, true, true));
+    private void ApplyBlueBalance(NumericNode blue)
+    {
         _blueBalance = blue.Value;
         _blueBalanceMin = blue.Minimum;
         _blueBalanceMax = blue.Maximum;
-
-        _parametersLoaded = true;
     }
 
     private void SetExposureAuto(bool enabled)
