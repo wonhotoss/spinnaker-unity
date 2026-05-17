@@ -1,0 +1,40 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:Style src="EvaluationPreview.uss" />
+    <ui:VisualElement name="evaluation-root" class="evaluation-root">
+        <ui:VisualElement name="preview-stage" class="preview-stage">
+            <ui:Image name="camera-view" class="preview-image" picking-mode="Ignore" scale-mode="ScaleToFit" />
+            <ui:Image name="evaluation-view" class="preview-image" picking-mode="Ignore" scale-mode="ScaleToFit" />
+            <ui:Label name="empty-label" class="empty-label" text="No frame" />
+        </ui:VisualElement>
+        <ui:VisualElement name="control-panel" class="control-panel">
+            <ui:Label class="title-label" text="Camera Evaluation" />
+            <ui:Label name="status-label" class="info-label" />
+            <ui:Label name="camera-label" class="info-label" />
+            <ui:Label name="stream-label" class="info-label" />
+            <ui:Label name="fps-label" class="info-label" />
+            <ui:VisualElement class="button-row">
+                <ui:Button name="initialize-button" class="panel-button left-button" text="Initialize" />
+                <ui:Button name="open-first-button" class="panel-button" text="Open First" />
+            </ui:VisualElement>
+            <ui:VisualElement class="button-row">
+                <ui:Button name="stream-button" class="panel-button left-button" text="Start" />
+                <ui:Button name="refresh-cameras-button" class="panel-button" text="Refresh Cameras" />
+            </ui:VisualElement>
+            <ui:Label class="section-label" text="Evaluation Limits" />
+            <ui:VisualElement class="limit-row">
+                <ui:Label class="limit-label" text="Upper" />
+                <ui:VisualElement class="limit-controls">
+                    <ui:Slider name="upper-slider" class="limit-slider" low-value="0" high-value="1" />
+                    <ui:FloatField name="upper-field" class="limit-field" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="limit-row">
+                <ui:Label class="limit-label" text="Lower" />
+                <ui:VisualElement class="limit-controls">
+                    <ui:Slider name="lower-slider" class="limit-slider" low-value="0" high-value="1" />
+                    <ui:FloatField name="lower-field" class="limit-field" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
