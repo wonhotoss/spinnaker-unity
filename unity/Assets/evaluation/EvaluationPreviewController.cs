@@ -175,6 +175,7 @@ public sealed class EvaluationPreviewController : MonoBehaviour {
         _evaluation_image.scaleMode = ScaleMode.ScaleToFit;
         _camera_image.pickingMode = PickingMode.Ignore;
         _evaluation_image.pickingMode = PickingMode.Ignore;
+        sync_preview_image_uvs();
         _upper_slider.lowValue = 0f;
         _upper_slider.highValue = 1f;
         _lower_slider.lowValue = 0f;
@@ -327,6 +328,7 @@ public sealed class EvaluationPreviewController : MonoBehaviour {
             };
 
             _camera_image.image = _camera_texture;
+            sync_preview_image_uvs();
         }
 
         int packed_stride = frame.Width * 3;
@@ -346,6 +348,7 @@ public sealed class EvaluationPreviewController : MonoBehaviour {
 
         _camera_texture.LoadRawTextureData(upload_data);
         _camera_texture.Apply(false);
+        _camera_image.MarkDirtyRepaint();
 
         if (_empty_label != null) {
             _empty_label.style.display = DisplayStyle.None;
@@ -370,10 +373,21 @@ public sealed class EvaluationPreviewController : MonoBehaviour {
             };
             _evaluation_texture.Create();
             _evaluation_image.image = _evaluation_texture;
+            sync_preview_image_uvs();
         }
 
         update_overlay_material_properties();
         Graphics.Blit(_camera_texture, _evaluation_texture, _overlay_material);
+        _evaluation_image.MarkDirtyRepaint();
+    }
+
+    void sync_preview_image_uvs() {
+        var uv = SystemInfo.graphicsUVStartsAtTop
+            ? new Rect(0f, 1f, 1f, -1f)
+            : new Rect(0f, 0f, 1f, 1f);
+
+        _camera_image.uv = uv;
+        _evaluation_image.uv = uv;
     }
 
     void set_upper_limit(float value) {
